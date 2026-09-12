@@ -1,0 +1,28 @@
+# Data — never commit raw or processed data
+data/raw/*
+data/interim/*
+data/processed/*
+!data/**/.gitkeep
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Env / secrets
+.env
+kaggle.json
+auth.db
+
+# MLflow / trained model artifacts
+mlruns/
+mlartifacts/
+artifacts/
+
+# OS
+.DS_Store
+desktop.ini
