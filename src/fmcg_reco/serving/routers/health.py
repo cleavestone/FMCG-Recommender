@@ -10,5 +10,8 @@ def health() -> dict:
 
 @router.get("/health/ready", summary="Readiness check")
 def ready(request: Request) -> dict:
-    is_ready = hasattr(request.app.state, "hybrid_model") and hasattr(request.app.state, "affinity_model")
+    is_ready = all(
+        hasattr(request.app.state, attr)
+        for attr in ("hybrid_model", "affinity_model", "replenishment_model")
+    )
     return {"ready": is_ready}

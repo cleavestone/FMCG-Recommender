@@ -4,32 +4,41 @@ import pandas as pd
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
-from fmcg_reco.artifacts import load_affinity_artifacts, load_artifacts
+from fmcg_reco.artifacts import (
+    load_affinity_artifacts,
+    load_artifacts,
+    load_replenishment_artifacts,
+)
 from fmcg_reco.config import PROCESSED_DIR, RAW_DIR, settings
 from fmcg_reco.serving.auth.router import router as auth_router
 from fmcg_reco.serving.auth.store import init_db
 from fmcg_reco.serving.routers.health import router as health_router
 from fmcg_reco.serving.routers.items import router as items_router
 from fmcg_reco.serving.routers.recommendations import router as recommendations_router
+from fmcg_reco.serving.routers.replenishment import router as replenishment_router
 
 DESCRIPTION = """
 Hybrid FMCG recommender trained on the Dunnhumby *Complete Journey* dataset,
-exposing two independent recommendation surfaces:
+exposing three independent recommendation surfaces:
 
 - **Reorder** (`/recommendations/{household_id}`) — rank-fusion hybrid of
   content, collaborative, and repeat-purchase signals.
 - **Basket growth** (`/recommendations/{household_id}/complete-basket`) —
   association-rule cross-sell, with the triggering rule returned alongside
   each suggestion.
+- **Replenishment** (`/households/{household_id}/replenishment`) — what's
+  probably due soon, with an honest uncertainty window rather than a
+  precise date.
 
 Authenticate via `/auth/token` (OAuth2 password grant) before calling any
-`recommendations` or `items` endpoint.
+`recommendations`, `households`, or `items` endpoint.
 """
 
 TAGS_METADATA = [
     {"name": "auth", "description": "OAuth2 password grant, JWT bearer tokens."},
     {"name": "health", "description": "Liveness and readiness checks."},
     {"name": "recommendations", "description": "Reorder and basket-growth recommendations, per household."},
+    {"name": "replenishment", "description": "Forecasted timing and quantity of a household's next purchases."},
     {"name": "items", "description": "Item-to-item content similarity."},
 ]
 
@@ -59,6 +68,7 @@ async def lifespan(app: FastAPI):
     app.state.product_catalog = product.set_index("product_id")
     app.state.hybrid_model = load_artifacts(settings.hybrid_artifact_dir, product, demographic)
     app.state.affinity_model = load_affinity_artifacts(settings.affinity_artifact_dir)
+    app.state.replenishment_model = load_replenishment_artifacts(settings.replenishment_artifact_dir, product)
 
     yield
 
@@ -75,6 +85,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(health_router)
     app.include_router(recommendations_router)
+    app.include_router(replenishment_router)
     app.include_router(items_router)
 
     @app.get("/docs", include_in_schema=False)

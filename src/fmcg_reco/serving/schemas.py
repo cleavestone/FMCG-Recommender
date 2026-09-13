@@ -31,3 +31,15 @@ class BasketCompletionItem(RecommendedItem):
 class BasketCompletionResponse(BaseModel):
     household_id: int
     items: list[BasketCompletionItem]
+
+
+class ReplenishmentItem(RecommendedItem):
+    days_until_due: float
+    window_days: float
+    expected_quantity: float
+
+
+class ReplenishmentResponse(BaseModel):
+    household_id: int
+    as_of_day: int
+    items: list[ReplenishmentItem]

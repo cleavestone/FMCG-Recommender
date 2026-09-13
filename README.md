@@ -17,24 +17,26 @@ demographics, marketing campaigns, coupons, and promotion-exposure data).
 | Collaborative filtering | ALS (`implicit`) | learned taste from purchase behaviour |
 | Hybrid | rank-fusion of the above + cold-start fallback | reorder-focused recommendations |
 | Market basket analysis | FP-Growth, association rules | basket growth / cross-sell / "complete your basket" |
+| Replenishment forecasting | per-pair gap/quantity statistics | "what's due soon," and how much |
 
-Two recommendation surfaces are served, deliberately kept separate rather
-than blended into one score (see `reports/05_*` and `reports/07_*` for why):
-a **reorder** engine (the hybrid) and a **discovery/cross-sell** engine
-(basket affinity). Full reasoning and honest results — including where
-models *didn't* beat a simpler baseline — are in `reports/`.
+Three recommendation surfaces are served, deliberately kept separate
+rather than blended into one score (see `reports/05_*`, `reports/07_*`,
+and `reports/08_*` for why): a **reorder** engine (the hybrid), a
+**discovery/cross-sell** engine (basket affinity), and a **replenishment**
+forecaster (timing + quantity). Full reasoning and honest results —
+including where models *didn't* beat a simpler baseline — are in `reports/`.
 
 ## Project layout
 
 ```
 data/                raw / interim / processed  (gitignored)
-notebooks/           numbered, exploratory-to-explanatory (01-07)
+notebooks/           numbered, exploratory-to-explanatory (01-08)
 reports/             per-notebook findings write-ups
 src/fmcg_reco/
   config.py            paths, constants, Settings (env-driven)
   data/                interaction matrix construction
   features/            item content features, association rule mining
-  models/              base interface + popularity/content/collaborative/hybrid/affinity
+  models/              base interface + popularity/content/collaborative/hybrid/affinity/replenishment
   evaluation/          splitting, metrics, candidate scoping, harness
   artifacts.py         train/serve boundary — save/load fitted models
   serving/             FastAPI app: auth, routers, dependency injection
@@ -53,11 +55,11 @@ uv run python -m ipykernel install --user --name fmcg --display-name "Python (fm
 bash scripts/download_data.sh
 ```
 
-Run the notebooks in order (01 → 07) to reproduce the modelling pipeline,
+Run the notebooks in order (01 → 08) to reproduce the modelling pipeline,
 or skip straight to training + serving:
 
 ```bash
-uv run python scripts/train.py          # writes artifacts/latest/{hybrid,affinity}/
+uv run python scripts/train.py          # writes artifacts/latest/{hybrid,affinity,replenishment}/
 cp .env.example .env                    # then set JWT_SECRET / ADMIN_API_KEY
 uv run uvicorn fmcg_reco.serving.main:app --reload
 ```
@@ -71,6 +73,7 @@ OAuth2 password grant, JWT bearer tokens. A demo user (`demo` /
 curl -X POST localhost:8000/auth/token -d "username=demo&password=demo-password"
 curl localhost:8000/recommendations/1 -H "Authorization: Bearer <token>"
 curl localhost:8000/recommendations/1/complete-basket -H "Authorization: Bearer <token>"
+curl localhost:8000/households/1/replenishment -H "Authorization: Bearer <token>"
 curl localhost:8000/items/<product_id>/similar -H "Authorization: Bearer <token>"
 ```
 
@@ -83,6 +86,7 @@ curl localhost:8000/items/<product_id>/similar -H "Authorization: Bearer <token>
 | `/health`, `/health/ready` | GET | none | liveness / model-loaded check |
 | `/recommendations/{household_id}` | GET | access token | reorder-focused |
 | `/recommendations/{household_id}/complete-basket` | GET | access token | cross-sell, with rule explanation |
+| `/households/{household_id}/replenishment` | GET | access token | what's due soon, with quantity + uncertainty window |
 | `/items/{product_id}/similar` | GET | access token | content-based item similarity |
 
 ### Security notes (portfolio-grade, stated explicitly)
@@ -117,6 +121,11 @@ uv run ruff check .
 - **P1** — evaluation harness + baselines ✅
 - **P2** — collaborative filtering + content-based ✅
 - **P3** — market basket analysis ✅
+- **P3.5** — replenishment forecasting (timing + quantity) ✅ — added after
+  noticing the existing surfaces could say *what* but not *when* or *how
+  much*; quantity forecasting works (~28% MAE improvement over baseline),
+  timing forecasting honestly does not yet beat a simpler household-average
+  baseline (see `reports/08_*`)
 - **P4** — learning-to-rank reranker — motivated but not built (see `reports/05_*`: linear rank-fusion collapsed to a single signal, an LTR model could learn conditional trust per household)
 - **P5** — uplift modeling + customer analytics — not started
 - **P6** — serving API ✅ (Streamlit dashboard not built)
@@ -124,5 +133,5 @@ uv run ruff check .
 
 ## Status
 
-Notebooks 01-07 complete, findings in `reports/`. Serving microservice
-(FastAPI, OAuth2, two recommendation surfaces, Docker, CI) complete.
+Notebooks 01-08 complete, findings in `reports/`. Serving microservice
+(FastAPI, OAuth2, three recommendation surfaces, Docker, CI) complete.

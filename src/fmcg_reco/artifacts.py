@@ -45,6 +45,7 @@ from fmcg_reco.models.popularity import (
     PopularityRecommender,
     SegmentPopularityRecommender,
 )
+from fmcg_reco.models.replenishment import ReplenishmentForecaster
 
 
 def _json_default(obj):
@@ -227,4 +228,34 @@ def load_affinity_artifacts(artifact_dir: Path) -> BasketAffinityRecommender:
 
     household_items = json.loads((artifact_dir / "affinity_household_items.json").read_text())
     model.household_items_ = {int(h): set(items) for h, items in household_items.items()}
+    return model
+
+
+def save_replenishment_artifacts(model: ReplenishmentForecaster, artifact_dir: Path) -> None:
+    """ReplenishmentForecaster's fitted state is a single small, plain
+    DataFrame (no sparse arrays, no per-household dicts) - parquet alone
+    is enough.
+    """
+    artifact_dir = Path(artifact_dir)
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+
+    model.pair_stats_.to_parquet(artifact_dir / "pair_stats.parquet", index=False)
+
+    meta = {
+        "min_purchases": model.min_purchases,
+        "quantity_cap_quantile": model.quantity_cap_quantile,
+        "reference_day": model.reference_day_,
+    }
+    (artifact_dir / "meta.json").write_text(json.dumps(meta, indent=2, default=_json_default))
+
+
+def load_replenishment_artifacts(artifact_dir: Path, product_df: pd.DataFrame) -> ReplenishmentForecaster:
+    artifact_dir = Path(artifact_dir)
+    meta = json.loads((artifact_dir / "meta.json").read_text())
+
+    model = ReplenishmentForecaster(
+        product_df, min_purchases=meta["min_purchases"], quantity_cap_quantile=meta["quantity_cap_quantile"]
+    )
+    model.pair_stats_ = pd.read_parquet(artifact_dir / "pair_stats.parquet")
+    model.reference_day_ = meta["reference_day"]
     return model

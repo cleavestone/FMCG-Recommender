@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     database_url: str = f"sqlite:///{ROOT / 'auth.db'}"
     hybrid_artifact_dir: Path = ROOT / "artifacts" / "latest" / "hybrid"
     affinity_artifact_dir: Path = ROOT / "artifacts" / "latest" / "affinity"
+    replenishment_artifact_dir: Path = ROOT / "artifacts" / "latest" / "replenishment"
 
 
 settings = Settings()
